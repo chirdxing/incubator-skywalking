@@ -20,6 +20,7 @@
 package org.apache.skywalking.apm.plugin.tomcat78x;
 
 import java.lang.reflect.Method;
+import org.apache.catalina.connector.Response;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.skywalking.apm.agent.core.context.CarrierItem;
@@ -29,6 +30,8 @@ import org.apache.skywalking.apm.agent.core.context.tag.Tags;
 import org.apache.skywalking.apm.agent.core.context.trace.AbstractSpan;
 import org.apache.skywalking.apm.agent.core.context.trace.SpanLayer;
 import org.apache.skywalking.apm.agent.core.context.trace.TraceSegment;
+import org.apache.skywalking.apm.agent.core.logging.api.ILog;
+import org.apache.skywalking.apm.agent.core.logging.api.LogManager;
 import org.apache.skywalking.apm.agent.core.plugin.interceptor.enhance.EnhancedInstance;
 import org.apache.skywalking.apm.agent.core.plugin.interceptor.enhance.InstanceMethodsAroundInterceptor;
 import org.apache.skywalking.apm.agent.core.plugin.interceptor.enhance.MethodInterceptResult;
@@ -40,7 +43,7 @@ import org.apache.skywalking.apm.network.trace.component.ComponentsDefine;
  * trace segment id of the previous level if the serialized context is not null.
  */
 public class TomcatInvokeInterceptor implements InstanceMethodsAroundInterceptor {
-
+    private static final ILog logger = LogManager.getLogger(TomcatInvokeInterceptor.class);
     /**
      * * The {@link TraceSegment#refs} of current trace segment will reference to the
      * trace segment id of the previous level if the serialized context is not null.
@@ -73,12 +76,24 @@ public class TomcatInvokeInterceptor implements InstanceMethodsAroundInterceptor
 
     @Override public Object afterMethod(EnhancedInstance objInst, Method method, Object[] allArguments,
         Class<?>[] argumentsTypes, Object ret) throws Throwable {
-        HttpServletResponse response = (HttpServletResponse)allArguments[1];
+        HttpServletResponse httpServletResponse = (HttpServletResponse)allArguments[1];
 
         AbstractSpan span = ContextManager.activeSpan();
-        if (response.getStatus() >= 400) {
+        int status = 200;
+        try {
+            if (httpServletResponse instanceof Response) {
+                Response r = (Response)httpServletResponse;
+                status = r.getStatus();
+            } else {
+                status = httpServletResponse.getStatus();
+            }
+        }
+        catch (Throwable e) {
+            logger.debug("ignore this error", new Object[] {e});
+        }
+        if (status >= 400) {
             span.errorOccurred();
-            Tags.STATUS_CODE.set(span, Integer.toString(response.getStatus()));
+            Tags.STATUS_CODE.set(span, Integer.toString(status));
         }
         ContextManager.stopSpan();
         ContextManager.getRuntimeContext().remove(Constants.FORWARD_REQUEST_FLAG);
