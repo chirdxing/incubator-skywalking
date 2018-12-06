@@ -27,6 +27,8 @@ import org.apache.skywalking.apm.agent.core.context.ContextManager;
 import org.apache.skywalking.apm.agent.core.context.tag.Tags;
 import org.apache.skywalking.apm.agent.core.context.trace.AbstractSpan;
 import org.apache.skywalking.apm.agent.core.context.trace.SpanLayer;
+import org.apache.skywalking.apm.agent.core.logging.api.ILog;
+import org.apache.skywalking.apm.agent.core.logging.api.LogManager;
 import org.apache.skywalking.apm.agent.core.plugin.interceptor.enhance.EnhancedInstance;
 import org.apache.skywalking.apm.agent.core.plugin.interceptor.enhance.InstanceMethodsAroundInterceptor;
 import org.apache.skywalking.apm.agent.core.plugin.interceptor.enhance.MethodInterceptResult;
@@ -42,7 +44,7 @@ import static org.apache.skywalking.apm.plugin.spring.mvc.commons.Constants.RESP
  */
 public abstract class AbstractMethodInterceptor implements InstanceMethodsAroundInterceptor {
     public abstract String getRequestURL(Method method);
-
+    private static final ILog logger = LogManager.getLogger(AbstractMethodInterceptor.class);
     @Override
     public void beforeMethod(EnhancedInstance objInst, Method method, Object[] allArguments, Class<?>[] argumentsTypes,
         MethodInterceptResult result) throws Throwable {
@@ -97,9 +99,15 @@ public abstract class AbstractMethodInterceptor implements InstanceMethodsAround
         try {
             if (response != null) {
                 AbstractSpan span = ContextManager.activeSpan();
-                if (response.getStatus() >= 400) {
+                int status = 200;
+                try {
+                    status = response.getStatus();
+                } catch (Throwable e) {
+                    logger.debug("ignore this error", new Object[] {e});
+                }
+                if (status >= 400) {
                     span.errorOccurred();
-                    Tags.STATUS_CODE.set(span, Integer.toString(response.getStatus()));
+                    Tags.STATUS_CODE.set(span, Integer.toString(status));
                 }
                 ContextManager.stopSpan();
             }

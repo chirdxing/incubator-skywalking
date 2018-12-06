@@ -78,6 +78,7 @@ public class SkyWalkingAgent {
             .ignore(nameStartsWith("org.slf4j."))
             .ignore(nameStartsWith("org.apache.logging."))
             .ignore(nameStartsWith("org.groovy."))
+            .ignore(nameStartsWith("org.apache.jsp."))
             .ignore(nameContains("javassist"))
             .ignore(nameContains(".asm."))
             .ignore(allSkyWalkingAgentExcludeToolkit())
